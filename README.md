@@ -12,14 +12,6 @@ You can install directly from GitHub:
 pip install git+https://github.com/derekhiggins/cachemeifyoucan.git
 ```
 
-## Usage
-
-Run the server:
-
-```bash
-uvicorn cachemeifyoucan:app --host 0.0.0.0 --port 9999
-```
-
 ## Configuration
 
 Edit `cachemeifyoucan.yaml` to add your target URLs. 
@@ -34,6 +26,14 @@ myapi:
 ```
 
 You can then access these targets by making requests to `/openai/...` or `/myapi/...` on your cachemeifyoucan server.
+
+## Usage
+
+Run the server:
+
+```bash
+uvicorn cachemeifyoucan:app --host 0.0.0.0 --port 9999
+```
 
 ## Testing the Cache
 
