@@ -24,6 +24,17 @@ uvicorn cachemeifyoucan:app --host 0.0.0.0 --port 9999
 
 Edit `cachemeifyoucan.yaml` to add your target URLs. 
 
+Each top-level key in the YAML file is a target name (e.g., `openai`). Under each target, specify the `url` field with the base URL you want requests to be proxied to. You can add multiple targets by adding more entries at the top level. For example:
+
+```yaml
+openai:
+  url: https://api.openai.com
+myapi:
+  url: https://my.custom.api/v1
+```
+
+You can then access these targets by making requests to `/openai/...` or `/myapi/...` on your cachemeifyoucan server.
+
 ## Testing the Cache
 
 You can test the caching behavior using `curl` to make POST requests to your running cache server. The first request will be slow (cache miss), the second identical request will be fast (cache hit), and changing the request body will result in another cache miss.
