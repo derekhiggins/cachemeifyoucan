@@ -8,10 +8,14 @@ import hashlib
 import json
 import os
 import yaml
+import logging
 
-# store to $HOME/.cache/http_cache
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# store to $HOME/.cache/cachemeifyoucan
 cache_dir = os.path.expanduser("~/.cache/cachemeifyoucan")
-
 # Calculate a cache key from passed in data
 async def calculate_cache_path(method, url, headers, body):
     # Create a normalized representation of the request
@@ -39,6 +43,7 @@ async def calculate_cache_path(method, url, headers, body):
 
 async def get_response_from_cache(cache_path: str) -> dict | None:
     if os.path.exists(cache_path):
+        logger.info(f"Getting response from cache: {cache_path}")
         with open(cache_path, "r") as f:
             return json.load(f)["response"]
     return None
@@ -53,7 +58,7 @@ async def save_response_to_cache(request_data, cache_path, response_data):
         "request": request_data,
         "response": response_data,
     }
-
+    logger.info(f"Saving response to cache: {cache_path}")
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     with open(cache_path, "w") as f:
         json.dump(cache_data, f)
@@ -64,7 +69,7 @@ app.state.config = None
 @app.on_event("startup")
 async def startup_event():
     config_path = os.environ.get("CACHE_CONFIG", "cachemeifyoucan.yaml")
-    print(f"Loading config from {config_path}, cache_dir: {cache_dir}")
+    logging.info(f"Loading config from {config_path}, cache_dir: {cache_dir}")
     with open(config_path, 'r') as f:
         app.state.config = yaml.safe_load(f)
 
