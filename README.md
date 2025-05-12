@@ -91,13 +91,7 @@ You should see the first and third requests take noticeably longer than the seco
 
 ### Viewing Newly Created Cache Entries
 
-After making requests, you can view the newly created cache entries (which are stored as JSON files) using the following command:
-
-```bash
-find ~/.cache/cachemeifyoucan/ -type f -mmin -1
-```
-
-This will list all cache files modified in the last minute. Each file corresponds to a unique request/response pair.
+After making requests, you can find the cache filenames directly in the server logs. Each log entry will indicate the path to the cache file corresponding to a unique request/response pair.
 
 ---
 
@@ -105,7 +99,7 @@ This will list all cache files modified in the last minute. Each file correspond
 
 You can manually edit a cache entry to provide a custom response for a given request. This is useful for testing how your application handles specific API responses, or for simulating error conditions and edge cases.
 
-1. **Locate the cache file**: Use the `find` command above to identify the relevant cache file for the request you want to modify.
+1. **Locate the cache file**: Check the server logs to identify the relevant cache file for the request you want to modify.
 2. **Open the cache file**: The cache files are standard JSON. Open the file in your favorite text editor, for example:
    ```bash
    vi ~/.cache/cachemeifyoucan/2b/2bf3d545329bd5dd5cf5aaa5537c3159.json
