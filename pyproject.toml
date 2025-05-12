@@ -1,0 +1,22 @@
+[project]
+name = "cachemeifyoucan"
+version = "0.1.0"
+description = "A FastAPI-based HTTP cache/proxy server."
+authors = [
+    { name = "Derek Higgins", email = "derekh@redhat.com" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "pyyaml"
+]
+
+[project.scripts]
+cachemeifyoucan = "cachemeifyoucan:app"
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta" 
