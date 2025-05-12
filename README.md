@@ -116,6 +116,6 @@ You can manually edit a cache entry to provide a custom response for a given req
 > **Note:** Be careful to maintain valid JSON structure when editing cache files manually.
 
 
-# Security Note on Cached Data
+## Security Note on Cached Data
 
 Cache files store request and response data, including headers and body content. To mitigate risks, the Authorization header in the stored request data within the cache file is masked (replaced with "***"). However, the response content is stored as received from the upstream server. In future we may make the list of masked Headers configurable.
