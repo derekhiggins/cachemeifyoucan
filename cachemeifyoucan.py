@@ -9,6 +9,7 @@ import json
 import os
 import yaml
 import logging
+import argparse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -99,13 +100,14 @@ async def catch_all(request: Request, path: str = ""):
 
     cache_path = await calculate_cache_path(method, path, headers, body)
 
-    # get a response from the cache if it exists
-    response = await get_response_from_cache(cache_path)
-    if response:
-        # remove headers that fastapi adds
-        for header in ["transfer-encoding", "content-length", "content-encoding", "connection"]:
-            response["headers"].pop(header, None)
-        return Response(content=response["content"].encode("utf-8"), status_code=response["status_code"], headers=response["headers"])
+    # get a response from the cache if it exists and we're not in save_only mode
+    if not app.state.save_only:
+        response = await get_response_from_cache(cache_path)
+        if response:
+            # remove headers that fastapi adds
+            for header in ["transfer-encoding", "content-length", "content-encoding", "connection"]:
+                response["headers"].pop(header, None)
+            return Response(content=response["content"].encode("utf-8"), status_code=response["status_code"], headers=response["headers"])
     
     # Forward the request to the selected target
     response_data = await forward_request(request_data, target_url)
@@ -141,7 +143,11 @@ async def forward_request(request_data, target_url):
         return response_data
 
 def main():
-    import uvicorn
+    parser = argparse.ArgumentParser(description="Cache proxy server")
+    parser.add_argument("--save-only", action="store_true", help="Only save responses to cache, don't serve from cache")
+    args = parser.parse_args()
+
+    app.state.save_only = args.save_only
     uvicorn.run("cachemeifyoucan:app", host="0.0.0.0", port=9999, reload=False)
 
 if __name__ == "__main__":
