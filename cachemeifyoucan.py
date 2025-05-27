@@ -86,9 +86,9 @@ async def catch_all(request: Request, path: str = ""):
     new_path = rest[0] if rest else ""
 
     config = app.state.config
-    if not config or target_name not in config:
+    if not config or target_name not in config.get("targets", {}):
         return Response(content=f"Unknown target: {target_name}", status_code=404)
-    target_url = config[target_name]["url"]
+    target_url = config["targets"][target_name]["url"]
 
     request_data = {
         "method": method,
@@ -141,7 +141,6 @@ async def forward_request(request_data, target_url):
         return response_data
 
 def main():
-    import uvicorn
     uvicorn.run("cachemeifyoucan:app", host="0.0.0.0", port=9999, reload=False)
 
 if __name__ == "__main__":
