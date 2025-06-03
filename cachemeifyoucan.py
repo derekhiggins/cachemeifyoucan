@@ -1,7 +1,9 @@
 """
 cachemeifyoucan: A FastAPI-based HTTP cache/proxy server.
 """
+import time
 from fastapi import FastAPI, Request, Response
+import jinja2
 import uvicorn
 import httpx
 import hashlib
@@ -70,6 +72,25 @@ def get_config_value(config, target_name, key, default=None):
         return config["targets"][target_name][key]
     return config.get(key, default)
 
+def transform(data, transform_headers, transform_body):
+    if transform_headers:
+        for header in transform_headers:
+            name = header.get("name", None)
+            value = header.get("value", None)
+            if name and value:
+                data["headers"][name] = jinja2.Template(value).render(headers=data["headers"], timestamp=str(time.time()))
+    if transform_body:
+        for transform in transform_body:
+            name = transform.get("name", None)
+            value = transform.get("value", None)
+            if name and value:
+                try:
+                    body = json.loads(data["body"])
+                    body[name] = jinja2.Template(value).render(body=body, timestamp=str(time.time()))
+                    data["body"] = json.dumps(body)
+                except Exception as e:
+                    logger.error(f"Error transforming body: {e}")
+
 app = FastAPI()
 app.state.config = None
 
@@ -106,24 +127,31 @@ async def catch_all(request: Request, path: str = ""):
 
     cache_path = await calculate_cache_path(method, path, headers, body)
 
+    transform_headers = get_config_value(config, target_name, "request", {}).get("transform_headers", {})
+    transform_body = get_config_value(config, target_name, "request", {}).get("transform_body", {})
+    if transform_headers or transform_body:
+        transform(request_data, transform_headers, transform_body)
+
     save_only= get_config_value(config, target_name, "save_only", False)
     if not save_only:
         # get a response from the cache if it exists
         response = await get_response_from_cache(cache_path)
-        if response:
-            # remove headers that fastapi adds
-            for header in ["transfer-encoding", "content-length", "content-encoding", "connection"]:
-                response["headers"].pop(header, None)
-            return Response(content=response["content"].encode("utf-8"), status_code=response["status_code"], headers=response["headers"])
-    
-    # Forward the request to the selected target
-    response_data = await forward_request(request_data, target_url)
-    await save_response_to_cache(request_data, cache_path, response_data)
+
+    if not response:
+        # Forward the request to the selected target
+        response = await forward_request(request_data, target_url)
+        await save_response_to_cache(request_data, cache_path, response)
 
     # remove headers that fastapi adds
     for header in ["transfer-encoding", "content-length", "content-encoding", "connection"]:
-        response_data["headers"].pop(header, None)
-    return Response(content=response_data["content"], status_code=response_data["status_code"], headers=response_data["headers"])
+        response["headers"].pop(header, None)
+
+
+    transform_headers = get_config_value(config, target_name, "response", {}).get("transform_headers", {})
+    transform_body = get_config_value(config, target_name, "response", {}).get("transform_body", {})
+    if transform_headers or transform_body:
+        transform(response, transform_headers, transform_body)
+    return Response(content=response["body"], status_code=response["status_code"], headers=response["headers"])
 
 async def forward_request(request_data, target_url):
     method = request_data["method"]
@@ -145,7 +173,7 @@ async def forward_request(request_data, target_url):
         response_data = {
             "status_code": response.status_code,
             "headers": dict(response.headers),
-            "content": response.content.decode("utf-8", errors="replace") if response.content else "",
+            "body": response.content.decode("utf-8", errors="replace") if response.content else "",
         }
         return response_data
 
