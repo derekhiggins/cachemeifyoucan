@@ -1,3 +1,4 @@
+save_only: false
 targets:
   openai:
     url: https://api.openai.com

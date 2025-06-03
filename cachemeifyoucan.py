@@ -63,6 +63,13 @@ async def save_response_to_cache(request_data, cache_path, response_data):
     with open(cache_path, "w") as f:
         json.dump(cache_data, f)
 
+def get_config_value(config, target_name, key, default=None):
+    if not config:
+        return default
+    if key in config.get("targets", {}).get(target_name, {}):
+        return config["targets"][target_name][key]
+    return config.get(key, default)
+
 app = FastAPI()
 app.state.config = None
 
@@ -99,13 +106,15 @@ async def catch_all(request: Request, path: str = ""):
 
     cache_path = await calculate_cache_path(method, path, headers, body)
 
-    # get a response from the cache if it exists
-    response = await get_response_from_cache(cache_path)
-    if response:
-        # remove headers that fastapi adds
-        for header in ["transfer-encoding", "content-length", "content-encoding", "connection"]:
-            response["headers"].pop(header, None)
-        return Response(content=response["content"].encode("utf-8"), status_code=response["status_code"], headers=response["headers"])
+    save_only= get_config_value(config, target_name, "save_only", False)
+    if not save_only:
+        # get a response from the cache if it exists
+        response = await get_response_from_cache(cache_path)
+        if response:
+            # remove headers that fastapi adds
+            for header in ["transfer-encoding", "content-length", "content-encoding", "connection"]:
+                response["headers"].pop(header, None)
+            return Response(content=response["content"].encode("utf-8"), status_code=response["status_code"], headers=response["headers"])
     
     # Forward the request to the selected target
     response_data = await forward_request(request_data, target_url)
