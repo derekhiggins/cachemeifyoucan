@@ -2,3 +2,13 @@ save_only: false
 targets:
   openai:
     url: https://api.openai.com
+    response:
+      transform_body:
+        - name: "id"
+          value: "{{body['id']}}__{{ timestamp }}"
+        - name: "created"
+          value: "{{ timestamp.split('.')[0] }}"
+  together:
+    url: https://api.together.xyz
+  fireworks:
+    url: https://api.fireworks.ai

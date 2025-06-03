@@ -1,0 +1,11 @@
+save_only: true
+targets:
+  github:
+    url: https://raw.githubusercontent.com
+    save_only: false
+  github_no_cache:
+    url: https://raw.githubusercontent.com
+    response:
+      transform_body:
+        - name: "name"
+          value: "{{body['name']}}__{{ timestamp }}"

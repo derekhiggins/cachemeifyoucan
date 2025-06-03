@@ -35,6 +35,54 @@ Run the server:
 uvicorn cachemeifyoucan:app --host 0.0.0.0 --port 9999
 ```
 
+## Transform Support
+
+cachemeifyoucan supports transforming both request and response data using Jinja2 templates. This allows you to modify headers and body content on-the-fly, which is useful for:
+
+- Adding timestamps or unique identifiers to responses
+- Modifying request headers before forwarding to upstream APIs
+- Transforming cached response data for testing different scenarios
+- Supporting streaming data transformations
+
+### Configuration
+
+Transforms can be configured for both requests and responses in your `cachemeifyoucan.yaml` file:
+
+```yaml
+targets:
+  openai:
+    url: https://api.openai.com
+    request:
+      transform_headers:
+        - name: "x-custom-header"
+          value: "modified-{{ timestamp }}"
+      transform_body:
+        - name: "custom_field"
+          value: "{{ body['existing_field'] }}_modified"
+    response:
+      transform_headers:
+        - name: "x-response-time"
+          value: "{{ timestamp }}"
+      transform_body:
+        - name: "id"
+          value: "{{ body['id'] }}__{{ timestamp }}"
+        - name: "created"
+          value: "{{ timestamp.split('.')[0] }}"
+```
+
+### Available Template Variables
+
+When using Jinja2 templates in transforms, you have access to:
+
+- `timestamp`: Current Unix timestamp as a string
+- `headers`: Dictionary of request/response headers (for header transforms)
+- `body`: Parsed JSON body content (for body transforms)
+- `line`: Line number (for streaming data transforms)
+
+### Streaming Data Support
+
+cachemeifyoucan automatically detects streaming responses (those starting with `data: `) and applies transforms to each JSON object in the stream. This is particularly useful for API endpoints that return server-sent events or streaming JSON responses.
+
 ## Testing the Cache
 
 You can test the caching behavior using `curl` to make POST requests to your running cache server. The first request will be slow (cache miss), the second identical request will be fast (cache hit), and changing the request body will result in another cache miss.

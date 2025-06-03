@@ -80,16 +80,30 @@ def transform(data, transform_headers, transform_body):
             if name and value:
                 data["headers"][name] = jinja2.Template(value).render(headers=data["headers"], timestamp=str(time.time()))
     if transform_body:
+        stream = False
+        if data["body"].startswith("data: "):
+            stream = True
         for transform in transform_body:
             name = transform.get("name", None)
             value = transform.get("value", None)
             if name and value:
-                try:
-                    body = json.loads(data["body"])
-                    body[name] = jinja2.Template(value).render(body=body, timestamp=str(time.time()))
-                    data["body"] = json.dumps(body)
-                except Exception as e:
-                    logger.error(f"Error transforming body: {e}")
+                if stream == False:
+                    try:
+                        body = json.loads(data["body"])
+                        body[name] = jinja2.Template(value).render(body=body, timestamp=str(time.time()))
+                        data["body"] = json.dumps(body)
+                    except Exception as e:
+                        logger.error(f"Error transforming body: {e}")
+                else:
+                    # streamed data is multiple lines of yaml so we need to split on \n and then json.loads each line
+                    lines = data["body"].split("\n")
+                    for i, line in enumerate(lines):
+                        if line.startswith("data: ") and line[6] == "{":
+                            body = json.loads(line[6:])
+                            if isinstance(body, dict): # Avoid [DONE] lines at the end of the stream
+                                body[name] = jinja2.Template(value).render(body=body, timestamp=str(time.time()), line=i)
+                                lines[i] = "data: " + json.dumps(body)
+                    data["body"] = "\n".join(lines)
 
 app = FastAPI()
 app.state.config = None
@@ -132,7 +146,9 @@ async def catch_all(request: Request, path: str = ""):
     if transform_headers or transform_body:
         transform(request_data, transform_headers, transform_body)
 
+
     save_only= get_config_value(config, target_name, "save_only", False)
+    response = None
     if not save_only:
         # get a response from the cache if it exists
         response = await get_response_from_cache(cache_path)
