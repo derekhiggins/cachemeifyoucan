@@ -134,6 +134,7 @@ async def catch_all(request: Request, path: str = ""):
 
     request_data = {
         "method": method,
+        "target_url": target_url,
         "path": new_path,
         "headers": headers,
         "body": body.decode("utf-8", errors="replace") if body else "",
@@ -155,7 +156,7 @@ async def catch_all(request: Request, path: str = ""):
 
     if not response:
         # Forward the request to the selected target
-        response = await forward_request(request_data, target_url)
+        response = await forward_request(request_data)
         await save_response_to_cache(request_data, cache_path, response)
 
     # remove headers that fastapi adds
@@ -169,8 +170,9 @@ async def catch_all(request: Request, path: str = ""):
         transform(response, transform_headers, transform_body)
     return Response(content=response["body"], status_code=response["status_code"], headers=response["headers"])
 
-async def forward_request(request_data, target_url):
+async def forward_request(request_data):
     method = request_data["method"]
+    target_url = request_data["target_url"]
     path = request_data["path"]
     headers = request_data["headers"]
     body = request_data["body"]
