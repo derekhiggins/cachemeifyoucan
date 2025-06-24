@@ -18,33 +18,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup cachemeifyoucan server
+        # TODO: change back to "."
+        uses: derekhiggins/cachemeifyoucan@actions
+        id: cache-server
         with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          pip install .
-          pip install uvicorn
-
-
-      - name: Start cachemeifyoucan server
-        run: |
-          export CACHE_CONFIG=tests/integration/cachemeifyoucan.yaml
-          uvicorn cachemeifyoucan:app --host 127.0.0.1 --port 9999 > server.log 2>&1 &
-          echo $! > uvicorn.pid
-          sleep 5  # Give the server time to start
+          config-file: 'tests/integration/cachemeifyoucan.yaml'
+          logfile: '/var/tmp/server.log'
+          port: '9999'
+          wait-for-server: 'true'
+          timeout: '30'
 
       - name: Download file via proxy (cache miss)
         run: |
-
           # Use GITHUB_HEAD_REF if it exists, otherwise use main
           REF=${GITHUB_HEAD_REF:-main}
           # Download file with github_no_cache target twice and make sure cache wasn't used
           curl -s -o /dev/null http://127.0.0.1:9999/github_no_cache/derekhiggins/cachemeifyoucan/refs/heads/$REF/tests/integration/testdata_1.json
           curl -s -O http://127.0.0.1:9999/github_no_cache/derekhiggins/cachemeifyoucan/refs/heads/$REF/tests/integration/testdata_1.json
-          grep "Getting response from cache" server.log && (echo "Cache hit detected" && exit 1)
+          grep "Getting response from cache" /var/tmp/server.log && (echo "Cache hit detected" && exit 1)
 
           # Check that the file was transformed
           grep "value__" testdata_1.json
@@ -53,7 +45,7 @@ jobs:
           curl -s -o downloaded1.md http://127.0.0.1:9999/github/derekhiggins/cachemeifyoucan/refs/heads/main/README.md
 
           # Check cache file created
-          CACHE_FILE=$(grep -oP '(?<=Saving response to cache: )[^ ]+' server.log | tail -1)
+          CACHE_FILE=$(grep -oP '(?<=Saving response to cache: )[^ ]+' /var/tmp/server.log | tail -1)
           if [ -z "$CACHE_FILE" ]; then
             echo "No cache file created"
             exit 1
@@ -63,7 +55,7 @@ jobs:
 
           # Check to make sure the cache was used
           curl -s -o downloaded2.md http://127.0.0.1:9999/github/derekhiggins/cachemeifyoucan/refs/heads/main/README.md
-          grep "Getting response from cache" server.log || (echo "No cache hit detected" && exit 1)
+          grep "Getting response from cache" /var/tmp/server.log || (echo "No cache hit detected" && exit 1)
 
           # Check that the 2 files are the same and contain some expected text
           diff downloaded1.md downloaded2.md
@@ -72,4 +64,4 @@ jobs:
       - name: Info
         if: always()
         run: |
-          cat server.log
+          cat /var/tmp/server.log

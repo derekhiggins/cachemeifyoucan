@@ -1,0 +1,122 @@
+name: 'Setup cachemeifyoucan'
+description: 'Set up and run a cachemeifyoucan HTTP cache/proxy server'
+author: 'Derek Higgins'
+
+inputs:
+  config-file:
+    description: 'Path to cachemeifyoucan.yaml configuration file'
+    required: false
+    default: 'cachemeifyoucan.yaml'
+  
+  port:
+    description: 'Port to run the server on'
+    required: false
+    default: '9999'
+  
+  host:
+    description: 'Host to bind the server to'
+    required: false
+    default: '0.0.0.0'
+    
+  wait-for-server:
+    description: 'Wait for server to be ready before completing'
+    required: false
+    default: 'true'
+  
+  timeout:
+    description: 'Timeout in seconds to wait for server'
+    required: false
+    default: '30'
+
+  logfile:
+    description: 'File to write logs to'
+    required: false
+    default: 'cachemeifyoucan.log'
+
+outputs:
+  server-url:
+    description: 'URL where the cachemeifyoucan server is running'
+    value: ${{ steps.server-info.outputs.url }}
+  
+  server-pid:
+    description: 'Process ID of the running server'
+    value: ${{ steps.start-server.outputs.pid }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+    
+    - name: Install cachemeifyoucan
+      shell: bash
+      run: |
+        pip install .
+    - name: Verify configuration file
+      shell: bash
+      run: |
+        if [ ! -f "${{ inputs.config-file }}" ]; then
+          echo "Configuration file ${{ inputs.config-file }} not found!"
+          echo "Creating a default configuration file..."
+          cat > "${{ inputs.config-file }}" << EOF
+        # Default cachemeifyoucan configuration
+        save_only: false
+        EOF
+          echo "::warning::Using default configuration. Please create your own ${{ inputs.config-file }} file."
+        fi
+        
+        echo "Configuration file contents:"
+        cat "${{ inputs.config-file }}"
+    
+    - name: Start cachemeifyoucan server
+      shell: bash
+      id: start-server
+      run: |
+        echo "Starting cachemeifyoucan server..."
+        
+        # Start server in background
+        export CACHE_CONFIG=${{ inputs.config-file }}
+        nohup uvicorn cachemeifyoucan:app \
+          --host ${{ inputs.host }} \
+          --port ${{ inputs.port }} \
+          --log-level info > ${{ inputs.logfile }} 2>&1 &
+        
+        SERVER_PID=$!
+        echo "pid=$SERVER_PID" >> $GITHUB_OUTPUT
+        echo "Server started with PID: $SERVER_PID"
+        echo "url=$SERVER_URL" >> $GITHUB_OUTPUT
+        echo "Server will be running at: $SERVER_URL"
+
+        # Save PID for cleanup
+        echo $SERVER_PID > cachemeifyoucan.pid
+    
+    - name: Wait for server to be ready
+      shell: bash
+      if: inputs.wait-for-server == 'true'
+      run: |
+        echo "Waiting for server to be ready..."
+        timeout=${{ inputs.timeout }}
+        counter=0
+        
+        while [ $counter -lt $timeout ]; do
+          if curl -s -f http://${{ inputs.host }}:${{ inputs.port }}/docs > /dev/null 2>&1; then
+            echo "Server is ready!"
+            break
+          fi
+          
+          sleep 1
+          counter=$((counter + 1))
+          
+          if [ $counter -eq $timeout ]; then
+            echo "::error::Server failed to start within $timeout seconds"
+            echo "Server logs:"
+            cat ${{ inputs.logfile }}
+            exit 1
+          fi
+        done
+    
+branding:
+  icon: 'server'
+  color: 'blue'

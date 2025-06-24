@@ -9,6 +9,7 @@ import argparse
 import sys
 import os
 import glob
+import subprocess
 from pathlib import Path
 import shlex
 
@@ -43,7 +44,7 @@ def json_to_curl(json_data, base_url="https://api.openai.com"):
     body = request.get('body', '')
 
     # Start building the curl command
-    curl_parts = ['curl']
+    curl_parts = ['curl', '-s']
 
     # Add method
     if method != 'GET':
@@ -111,6 +112,68 @@ def find_json_files(cache_dir):
     return json_files
 
 
+def run_curl_command(curl_command, timeout=30):
+    """
+    Execute a curl command and return the results.
+
+    Args:
+        curl_command: The curl command string to execute
+        timeout: Timeout in seconds for the command
+
+    Returns:
+        Dictionary with 'returncode', 'stdout', 'stderr', 'command'
+    """
+    try:
+        # Replace environment variables in the command
+        expanded_command = curl_command
+
+        # Handle OPENAI_API_KEY specifically
+        if '$OPENAI_API_KEY' in curl_command:
+            api_key = os.getenv('OPENAI_API_KEY')
+            if api_key:
+                expanded_command = curl_command.replace('$OPENAI_API_KEY', api_key)
+            else:
+                return {
+                    'returncode': -1,
+                    'stdout': '',
+                    'stderr': 'OPENAI_API_KEY environment variable not set',
+                    'command': curl_command
+                }
+
+        # Use shlex.split to properly handle quoted arguments
+        cmd_parts = shlex.split(expanded_command)
+
+        # Run the command
+        result = subprocess.run(
+            cmd_parts,
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+
+        return {
+            'returncode': result.returncode,
+            'stdout': result.stdout,
+            'stderr': result.stderr,
+            'command': curl_command
+        }
+
+    except subprocess.TimeoutExpired:
+        return {
+            'returncode': -1,
+            'stdout': '',
+            'stderr': f'Command timed out after {timeout} seconds',
+            'command': curl_command
+        }
+    except Exception as e:
+        return {
+            'returncode': -1,
+            'stdout': '',
+            'stderr': f'Error executing command: {str(e)}',
+            'command': curl_command
+        }
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Convert cached request JSON files to curl commands'
@@ -128,6 +191,17 @@ def main():
     parser.add_argument(
         '--output-file',
         help='Output file to write curl commands (default: stdout)'
+    )
+    parser.add_argument(
+        '--run',
+        action='store_true',
+        help='Execute the curl commands instead of just printing them'
+    )
+    parser.add_argument(
+        '--timeout',
+        type=int,
+        default=30,
+        help='Timeout in seconds for curl commands when using --run (default: 30)'
     )
 
     args = parser.parse_args()
@@ -153,7 +227,21 @@ def main():
             curl_command = process_json_file(json_file)
             if curl_command:
                 output.write(f"# From: {json_file}\n")
-                output.write(f"{curl_command}\n\n")
+
+                if args.run:
+                    # Execute the curl command
+                    output.write(f"# Command: {curl_command}\n")
+                    result = run_curl_command(curl_command, args.timeout)
+
+                    output.write(f"# Return code: {result['returncode']}\n")
+                    if result['stdout']:
+                        output.write(f"# Response:\n{result['stdout']}\n")
+                    if result['stderr']:
+                        output.write(f"# Error output:\n{result['stderr']}\n")
+                    output.write("\n")
+                else:
+                    # Just output the curl command
+                    output.write(f"{curl_command}\n\n")
 
     finally:
         if args.output_file:
