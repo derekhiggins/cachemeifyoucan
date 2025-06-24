@@ -39,9 +39,11 @@ jobs:
       - name: Download file via proxy (cache miss)
         run: |
 
+          # Use GITHUB_HEAD_REF if it exists, otherwise use main
+          REF=${GITHUB_HEAD_REF:-main}
           # Download file with github_no_cache target twice and make sure cache wasn't used
-          curl -s -o /dev/null http://127.0.0.1:9999/github_no_cache/derekhiggins/cachemeifyoucan/refs/heads/$GITHUB_HEAD_REF/tests/integration/testdata_1.json
-          curl -s -O http://127.0.0.1:9999/github_no_cache/derekhiggins/cachemeifyoucan/refs/heads/$GITHUB_HEAD_REF/tests/integration/testdata_1.json
+          curl -s -o /dev/null http://127.0.0.1:9999/github_no_cache/derekhiggins/cachemeifyoucan/refs/heads/$REF/tests/integration/testdata_1.json
+          curl -s -O http://127.0.0.1:9999/github_no_cache/derekhiggins/cachemeifyoucan/refs/heads/$REF/tests/integration/testdata_1.json
           grep "Getting response from cache" server.log && (echo "Cache hit detected" && exit 1)
 
           # Check that the file was transformed
