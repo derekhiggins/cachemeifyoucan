@@ -27,6 +27,29 @@ myapi:
 
 You can then access these targets by making requests to `/openai/...` or `/myapi/...` on your cachemeifyoucan server.
 
+### Response Delay
+
+You can add an artificial delay to cached responses to simulate slow API responses. The delay only applies when serving from cache, not when forwarding to the upstream API. This is useful for testing timeout handling and loading states in your application. The delay can be configured globally or per-target:
+
+```yaml
+# Global delay applied to all targets (in seconds)
+delay: 0.5
+jitter: 0.1  # Add 10% jitter (default)
+
+targets:
+  openai:
+    url: https://api.openai.com
+    delay: 2.0  # Override global delay for this target
+    jitter: 0.2  # 20% jitter for this target
+  myapi:
+    url: https://my.custom.api/v1
+    # Uses global delay of 0.5 seconds with 10% jitter
+```
+
+The delay value is in seconds and can be a float (e.g., `0.5` for 500ms, `2.0` for 2 seconds). If not specified, no delay is applied.
+
+The jitter value is a percentage (as a decimal) that adds random variance to the delay. For example, with `delay: 1.0` and `jitter: 0.1`, the actual delay will randomly vary between 0.9 and 1.1 seconds. This helps simulate realistic network variability and prevents synchronized request patterns. The default jitter is 0.1 (10%).
+
 ## Usage
 
 Run the server:

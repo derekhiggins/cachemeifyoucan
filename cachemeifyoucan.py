@@ -1,7 +1,9 @@
 """
 cachemeifyoucan: A FastAPI-based HTTP cache/proxy server.
 """
+import asyncio
 import copy
+import random
 import time
 from fastapi import FastAPI, Request, Response
 import jinja2
@@ -154,9 +156,12 @@ async def catch_all(request: Request, path: str = ""):
 
     save_only= get_config_value(config, target_name, "save_only", False)
     response = None
+    cache_hit = False
     if not save_only:
         # get a response from the cache if it exists
         response = await get_response_from_cache(cache_path)
+        if response:
+            cache_hit = True
 
     if not response:
         # Forward the request to the selected target
@@ -173,6 +178,17 @@ async def catch_all(request: Request, path: str = ""):
     transform_body = get_config_value(config, target_name, "response", {}).get("transform_body", {})
     if transform_headers or transform_body:
         transform(response, transform_headers, transform_body)
+
+    # Apply configurable delay only for cached responses
+    if cache_hit:
+        delay = get_config_value(config, target_name, "delay", 0)
+        if delay > 0:
+            jitter = get_config_value(config, target_name, "jitter", 0.1)
+            # Apply jitter as a percentage of the delay
+            jitter_amount = delay * jitter * (random.random() * 2 - 1)
+            actual_delay = delay + jitter_amount
+            await asyncio.sleep(max(0, actual_delay))
+
     return Response(content=response["body"], status_code=response["status_code"], headers=response["headers"])
 
 async def forward_request(request_data):
