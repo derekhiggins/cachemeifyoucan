@@ -12,6 +12,8 @@ import json
 import os
 import yaml
 import logging
+import aiofiles
+import aiofiles.os
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,10 +47,11 @@ async def calculate_cache_path(method, url, headers, body):
     return os.path.join(cache_dir, shard, key+".json")
 
 async def get_response_from_cache(cache_path: str) -> dict | None:
-    if os.path.exists(cache_path):
+    if await aiofiles.os.path.exists(cache_path):
         logger.info(f"Getting response from cache: {cache_path}")
-        with open(cache_path, "r") as f:
-            return json.load(f)["response"]
+        async with aiofiles.open(cache_path, "r") as f:
+            content = await f.read()
+            return json.loads(content)["response"]
     return None
 
 async def save_response_to_cache(request_data, cache_path, response_data):
@@ -63,8 +66,8 @@ async def save_response_to_cache(request_data, cache_path, response_data):
     }
     logger.info(f"Saving response to cache: {cache_path}")
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-    with open(cache_path, "w") as f:
-        json.dump(cache_data, f)
+    async with aiofiles.open(cache_path, "w") as f:
+        await f.write(json.dumps(cache_data))
 
 def get_config_value(config, target_name, key, default=None):
     if not config:

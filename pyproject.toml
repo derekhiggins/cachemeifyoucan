@@ -12,7 +12,8 @@ dependencies = [
     "Jinja2",
     "uvicorn[standard]",
     "httpx",
-    "pyyaml"
+    "pyyaml",
+    "aiofiles"
 ]
 
 [project.scripts]
