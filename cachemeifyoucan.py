@@ -1,6 +1,7 @@
 """
 cachemeifyoucan: A FastAPI-based HTTP cache/proxy server.
 """
+import copy
 import time
 from fastapi import FastAPI, Request, Response
 import jinja2
@@ -52,7 +53,7 @@ async def get_response_from_cache(cache_path: str) -> dict | None:
 
 async def save_response_to_cache(request_data, cache_path, response_data):
     # Mask authorization header
-    headers = request_data["headers"]
+    headers = copy.copy(request_data["headers"])
     if "authorization" in headers:
         headers["authorization"] = "***"
 
@@ -156,6 +157,7 @@ async def catch_all(request: Request, path: str = ""):
 
     if not response:
         # Forward the request to the selected target
+        await save_response_to_cache(request_data, cache_path, {})
         response = await forward_request(request_data)
         await save_response_to_cache(request_data, cache_path, response)
 
